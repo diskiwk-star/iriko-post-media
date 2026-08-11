@@ -135,7 +135,7 @@ def main():
         print("ERROR: IG_ACCESS_TOKEN / IG_USER_ID が未設定")
         sys.exit(1)
 
-    today = datetime.now(JST).strftime("%Y-%m-%d")
+    today = os.environ.get("QUEUE_DATE") or datetime.now(JST).strftime("%Y-%m-%d")
     qfile = QUEUE_DIR / f"{today}.json"
     done_marker = QUEUE_DIR / f"{today}.{SLOT}.done"
 
