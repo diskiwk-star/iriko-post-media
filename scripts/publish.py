@@ -84,8 +84,26 @@ def post_feed(entry: dict):
     caption = entry.get("caption", "")
     media = entry["media"]
 
+    # 共同投稿（コラボ）。相手に招待が飛び、相手が承認して初めて相手側に表示される。
+    # ストーリーズは非対応なので post_story では扱わない。
+    collab = entry.get("collaborators") or []
+    collab_param = {"collaborators": json.dumps(collab)} if collab else {}
+    if collab:
+        print(f"  共同投稿の招待: {', '.join(collab)}")
+
+    def create_container(params: dict) -> dict:
+        """親コンテナを作る。collaborators で弾かれたら共同投稿なしで作り直す
+        （共同投稿が通らなくても、その日の投稿自体は落とさない）"""
+        try:
+            return api_post(f"/{USER_ID}/media", {**params, **collab_param})
+        except RuntimeError as e:
+            if not collab_param:
+                raise
+            print(f"  警告: 共同投稿の指定でAPIエラー。共同投稿なしで投稿します → {e}")
+            return api_post(f"/{USER_ID}/media", params)
+
     if typ == "image":
-        c = api_post(f"/{USER_ID}/media", {"image_url": media[0], "caption": caption})
+        c = create_container({"image_url": media[0], "caption": caption})
         result = publish(c["id"])
     elif typ == "carousel":
         children = []
@@ -94,7 +112,7 @@ def post_feed(entry: dict):
                          {"image_url": url, "is_carousel_item": "true"})
             children.append(c["id"])
             time.sleep(2)
-        parent = api_post(f"/{USER_ID}/media", {
+        parent = create_container({
             "media_type": "CAROUSEL",
             "children": ",".join(children),
             "caption": caption,
@@ -109,7 +127,7 @@ def post_feed(entry: dict):
         }
         if entry.get("cover"):
             params["cover_url"] = entry["cover"]
-        c = api_post(f"/{USER_ID}/media", params)
+        c = create_container(params)
         wait_until_ready(c["id"])
         result = publish(c["id"])
     else:
