@@ -1,0 +1,39 @@
+name: post-feed (5:00 JST)
+
+on:
+  schedule:
+    - cron: '0 20 * * *'   # 20:00 UTC = 翌日 5:00 JST
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'ドライラン（投稿せず内容表示のみ）'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ig-post
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publish to Instagram (feed slot)
+        env:
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ vars.IG_USER_ID }}
+          SLOT: feed
+          DRY_RUN: ${{ inputs.dry_run == true && '1' || '' }}
+        run: python3 scripts/publish.py
+
+      - name: Commit done marker
+        run: |
+          git config user.name "iriko-autopost-bot"
+          git config user.email "actions@github.com"
+          git add queue/*.done 2>/dev/null || true
+          git diff --cached --quiet || (git commit -m "feed posted $(date -u +%F)" && git push)
