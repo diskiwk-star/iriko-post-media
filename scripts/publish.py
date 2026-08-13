@@ -6,11 +6,18 @@
   IG_ACCESS_TOKEN : Instagram Login APIのアクセストークン（Actions Secret）
   IG_USER_ID      : IGユーザーID
   SLOT            : "feed"（5:00枠: フィード/カルーセル/リール） or "story"（5:30枠）
+  TARGET_TIME     : 投稿目標時刻（JST・"HH:MM"）。既定は feed=05:00 / story=05:30
   DRY_RUN         : "1" なら投稿せずAPIリクエスト内容を表示のみ
 
 動作:
   queue/YYYY-MM-DD.json（JSTの今日）を読み、SLOTに対応する投稿を実行。
   成功したら queue/YYYY-MM-DD.{slot}.done を作成（ワークフロー側でコミット）。
+
+投稿時刻について:
+  GitHub Actionsの定時実行は混雑時に数時間遅れることがある（2026-08-13に約2時間20分の
+  遅延を実測）。そのため cron は目標時刻より少し早めに設定し、早く起動したときは
+  TARGET_TIME まで待ってから投稿する。遅れて起動したときは待たずにすぐ投稿する。
+  同じslotに複数のcronを仕掛けてあるが、.done マーカーで二重投稿は防がれる。
 """
 
 import json
@@ -29,6 +36,8 @@ TOKEN = os.environ.get("IG_ACCESS_TOKEN", "")
 USER_ID = os.environ.get("IG_USER_ID", "")
 SLOT = os.environ.get("SLOT", "feed")
 DRY_RUN = os.environ.get("DRY_RUN", "") == "1"
+TARGET_TIME = os.environ.get("TARGET_TIME") or ("05:00" if SLOT == "feed" else "05:30")
+MAX_WAIT_SEC = 90 * 60  # 早く起動しすぎた場合の待機上限（保険）
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 QUEUE_DIR = REPO_ROOT / "queue"
@@ -148,6 +157,27 @@ def post_story(entry: dict):
     print(f"  published: {result}")
 
 
+def wait_until_target():
+    """目標時刻(JST)より早く起動したら、その時刻まで待つ。遅れていたら即座に戻る。"""
+    now = datetime.now(JST)
+    hh, mm = (int(x) for x in TARGET_TIME.split(":"))
+    target = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+    delta = (target - now).total_seconds()
+
+    if delta <= 0:
+        late = int(-delta // 60)
+        print(f"目標 {TARGET_TIME} を{late}分過ぎて起動。待たずに投稿します。")
+        return
+    if delta > MAX_WAIT_SEC:
+        print(f"目標 {TARGET_TIME} まで{int(delta // 60)}分あり、待機上限を超えるため中止。"
+              "（cronの設定が早すぎる可能性があります）")
+        sys.exit(0)
+
+    print(f"目標 {TARGET_TIME} まで{int(delta // 60)}分{int(delta % 60)}秒待機します。")
+    if not DRY_RUN:
+        time.sleep(delta)
+
+
 def main():
     if not TOKEN or not USER_ID:
         print("ERROR: IG_ACCESS_TOKEN / IG_USER_ID が未設定")
@@ -171,6 +201,9 @@ def main():
     if not entry:
         print(f"このslot（{SLOT}）の予定なし。終了。")
         return
+
+    # 投稿する分があると確定してから、目標時刻まで待つ（空振りの日は待たない）
+    wait_until_target()
 
     print(f"投稿実行: {entry['type']} / media {len(entry['media'])}件")
     if SLOT == "feed":

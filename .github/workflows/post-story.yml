@@ -2,7 +2,10 @@ name: post-story (5:30 JST)
 
 on:
   schedule:
-    - cron: '30 20 * * *'   # 20:30 UTC = 翌日 5:30 JST
+    # 考え方は post-feed.yml と同じ。目標は5:30 JST。
+    - cron: '13 19 * * *'   # 19:13 UTC = 翌日 4:13 JST（本命・5:30まで待機）
+    - cron: '13 20 * * *'   # 20:13 UTC = 翌日 5:13 JST（予備1）
+    - cron: '13 21 * * *'   # 21:13 UTC = 翌日 6:13 JST（予備2・遅延時は即投稿）
   workflow_dispatch:
     inputs:
       dry_run:
@@ -14,7 +17,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: ig-post
+  group: ig-post-story
   cancel-in-progress: false
 
 jobs:

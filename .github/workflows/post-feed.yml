@@ -2,7 +2,13 @@ name: post-feed (5:00 JST)
 
 on:
   schedule:
-    - cron: '0 20 * * *'   # 20:00 UTC = 翌日 5:00 JST
+    # GitHubの定時実行は混雑時に数時間遅れる（2026-08-13に約2時間20分の遅延を実測）。
+    # 目標の5:00 JSTより早めに起動し、早すぎたら publish.py 側で5:00まで待つ。
+    # 毎時ちょうどは特に混むので、分をずらしてある。予備を2本置き、
+    # 先に投稿できた回の .done マーカーで二重投稿を防ぐ。
+    - cron: '43 18 * * *'   # 18:43 UTC = 翌日 3:43 JST（本命・5:00まで待機）
+    - cron: '43 19 * * *'   # 19:43 UTC = 翌日 4:43 JST（予備1）
+    - cron: '43 20 * * *'   # 20:43 UTC = 翌日 5:43 JST（予備2・遅延時は即投稿）
   workflow_dispatch:
     inputs:
       dry_run:
@@ -14,7 +20,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: ig-post
+  group: ig-post-feed
   cancel-in-progress: false
 
 jobs:
