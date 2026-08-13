@@ -85,7 +85,20 @@ def wait_until_ready(creation_id: str, timeout_sec: int = 600):
 
 
 def publish(creation_id: str) -> dict:
-    return api_post(f"/{USER_ID}/media_publish", {"creation_id": creation_id})
+    """公開する。コンテナ処理待ち(9007)の場合は少し待って再試行する。"""
+    last_err = None
+    for attempt in range(6):
+        try:
+            return api_post(f"/{USER_ID}/media_publish", {"creation_id": creation_id})
+        except RuntimeError as e:
+            # error_subcode 2207027 = メディアがまだ公開準備できていない
+            if "2207027" not in str(e) and '"code":9007' not in str(e):
+                raise
+            last_err = e
+            wait = 10 * (attempt + 1)
+            print(f"  まだ公開準備中。{wait}秒待って再試行（{attempt + 1}/6）")
+            time.sleep(wait)
+    raise RuntimeError(f"公開の再試行が上限に達しました: {last_err}")
 
 
 def post_feed(entry: dict):
