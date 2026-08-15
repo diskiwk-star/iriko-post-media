@@ -20,8 +20,10 @@ permissions:
   contents: write
 
 concurrency:
+  # 予備の実行が来たら、待機中の古い実行はキャンセルする。
+  # （待機中の実行はまだ .done を書けないため、放置すると二重投稿になる）
   group: ig-post-feed
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   post:

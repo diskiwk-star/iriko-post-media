@@ -191,6 +191,31 @@ def wait_until_target():
         time.sleep(delta)
 
 
+def already_posted_today(today: str, entry: dict) -> bool:
+    """今日すでに同じ内容が投稿済みかをAPIで確認する（二重投稿の最終防波堤）。
+
+    ストーリーズはmediaエッジに出ないため、feedのみキャプション先頭で判定する。
+    判定に失敗した場合は False（＝投稿を続行）を返す。
+    """
+    if SLOT != "feed":
+        return False
+    head = (entry.get("caption") or "")[:20].strip()
+    if not head:
+        return False
+    try:
+        res = api_get("/me/media", {"fields": "caption,timestamp", "limit": "5"})
+        for m in res.get("data", []):
+            ts = datetime.fromisoformat(m["timestamp"].replace("+0000", "+00:00"))
+            if ts.astimezone(JST).strftime("%Y-%m-%d") != today:
+                continue
+            if (m.get("caption") or "").startswith(head):
+                print(f"  既存投稿を検出: {m['timestamp']}")
+                return True
+    except Exception as e:
+        print(f"  （投稿済み確認をスキップ: {e}）")
+    return False
+
+
 def main():
     if not TOKEN or not USER_ID:
         print("ERROR: IG_ACCESS_TOKEN / IG_USER_ID が未設定")
@@ -217,6 +242,13 @@ def main():
 
     # 投稿する分があると確定してから、目標時刻まで待つ（空振りの日は待たない）
     wait_until_target()
+
+    # 待機中に別の実行が投稿を終えている場合があるので、投稿直前にAPIで最終確認する。
+    # （done markerはコミットされるまで他の実行から見えないため、これが唯一確実な砦）
+    if not DRY_RUN and already_posted_today(today, entry):
+        print("待機中に別の実行が同じ内容を投稿済みでした。二重投稿を回避して終了。")
+        done_marker.write_text(datetime.now(JST).isoformat(), encoding="utf-8")
+        return
 
     print(f"投稿実行: {entry['type']} / media {len(entry['media'])}件")
     if SLOT == "feed":

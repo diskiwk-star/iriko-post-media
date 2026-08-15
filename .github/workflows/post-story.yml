@@ -17,8 +17,9 @@ permissions:
   contents: write
 
 concurrency:
+  # 予備の実行が来たら、待機中の古い実行はキャンセルする。
   group: ig-post-story
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   post:
