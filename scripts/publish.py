@@ -32,8 +32,25 @@ from pathlib import Path
 API = "https://graph.instagram.com/v23.0"
 JST = timezone(timedelta(hours=9))
 
-TOKEN = os.environ.get("IG_ACCESS_TOKEN", "")
-USER_ID = os.environ.get("IG_USER_ID", "")
+# 投稿先アカウント。queueで "accounts": ["tadotsu","kanonji"] のように指定できる。
+# 省略時は多度津のみ（従来どおり）。
+ACCOUNTS = {
+    "tadotsu": {
+        "label": "多度津",
+        "token": os.environ.get("IG_ACCESS_TOKEN", ""),
+        "user_id": os.environ.get("IG_USER_ID", ""),
+    },
+    "kanonji": {
+        "label": "観音寺",
+        "token": os.environ.get("IG_ACCESS_TOKEN_KANONJI", ""),
+        "user_id": os.environ.get("IG_USER_ID_KANONJI", ""),
+    },
+}
+DEFAULT_ACCOUNTS = ["tadotsu"]
+
+# 実行中のアカウント（use_account で切り替える）
+TOKEN = ACCOUNTS["tadotsu"]["token"]
+USER_ID = ACCOUNTS["tadotsu"]["user_id"]
 SLOT = os.environ.get("SLOT", "feed")
 DRY_RUN = os.environ.get("DRY_RUN", "") == "1"
 TARGET_TIME = os.environ.get("TARGET_TIME") or ("05:00" if SLOT == "feed" else "05:30")
@@ -216,22 +233,29 @@ def already_posted_today(today: str, entry: dict) -> bool:
     return False
 
 
-def main():
-    if not TOKEN or not USER_ID:
-        print("ERROR: IG_ACCESS_TOKEN / IG_USER_ID が未設定")
-        sys.exit(1)
+def use_account(key: str):
+    """以降のAPI呼び出しで使うアカウントを切り替える。"""
+    global TOKEN, USER_ID
+    acc = ACCOUNTS[key]
+    TOKEN = acc["token"]
+    USER_ID = acc["user_id"]
 
+
+def done_marker_path(today: str, account: str) -> Path:
+    # 多度津は従来のファイル名を維持する（過去分のマーカーと互換を保つため）
+    if account == "tadotsu":
+        return QUEUE_DIR / f"{today}.{SLOT}.done"
+    return QUEUE_DIR / f"{today}.{SLOT}.{account}.done"
+
+
+def main():
     today = os.environ.get("QUEUE_DATE") or datetime.now(JST).strftime("%Y-%m-%d")
     qfile = QUEUE_DIR / f"{today}.json"
-    done_marker = QUEUE_DIR / f"{today}.{SLOT}.done"
 
     print(f"date(JST)={today} slot={SLOT} dry_run={DRY_RUN}")
 
     if not qfile.exists():
         print(f"queue無し（{qfile.name}）。今日は投稿予定なし。終了。")
-        return
-    if done_marker.exists():
-        print(f"{done_marker.name} が存在。既に投稿済み。終了。")
         return
 
     queue = json.loads(qfile.read_text(encoding="utf-8"))
@@ -240,25 +264,61 @@ def main():
         print(f"このslot（{SLOT}）の予定なし。終了。")
         return
 
+    # 投稿先アカウント（queueで指定。省略時は多度津のみ）
+    targets = entry.get("accounts") or DEFAULT_ACCOUNTS
+    unknown = [a for a in targets if a not in ACCOUNTS]
+    if unknown:
+        print(f"ERROR: 未知のアカウント指定 {unknown}")
+        sys.exit(1)
+
+    # まだ投稿していないアカウントだけに絞る
+    pending = [a for a in targets if not done_marker_path(today, a).exists()]
+    if not pending:
+        print("対象アカウントはすべて投稿済み。終了。")
+        return
+    print(f"投稿先: {'、'.join(ACCOUNTS[a]['label'] for a in pending)}")
+
+    for a in pending:
+        if not ACCOUNTS[a]["token"] or not ACCOUNTS[a]["user_id"]:
+            print(f"ERROR: {ACCOUNTS[a]['label']}のトークン/ユーザーIDが未設定")
+            sys.exit(1)
+
     # 投稿する分があると確定してから、目標時刻まで待つ（空振りの日は待たない）
     wait_until_target()
 
-    # 待機中に別の実行が投稿を終えている場合があるので、投稿直前にAPIで最終確認する。
-    # （done markerはコミットされるまで他の実行から見えないため、これが唯一確実な砦）
-    if not DRY_RUN and already_posted_today(today, entry):
-        print("待機中に別の実行が同じ内容を投稿済みでした。二重投稿を回避して終了。")
-        done_marker.write_text(datetime.now(JST).isoformat(), encoding="utf-8")
-        return
+    failed = []
+    for account in pending:
+        use_account(account)
+        label = ACCOUNTS[account]["label"]
+        print(f"--- {label} ---")
 
-    print(f"投稿実行: {entry['type']} / media {len(entry['media'])}件")
-    if SLOT == "feed":
-        post_feed(entry)
-    else:
-        post_story(entry)
+        # 待機中に別の実行が投稿を終えている場合があるので、投稿直前にAPIで最終確認する。
+        # （done markerはコミットされるまで他の実行から見えないため、これが唯一確実な砦）
+        if not DRY_RUN and already_posted_today(today, entry):
+            print("  待機中に別の実行が同じ内容を投稿済みでした。二重投稿を回避。")
+            done_marker_path(today, account).write_text(
+                datetime.now(JST).isoformat(), encoding="utf-8")
+            continue
 
-    if not DRY_RUN:
-        done_marker.write_text(datetime.now(JST).isoformat(), encoding="utf-8")
-        print(f"done marker作成: {done_marker.name}")
+        print(f"  投稿実行: {entry['type']} / media {len(entry['media'])}件")
+        try:
+            if SLOT == "feed":
+                post_feed(entry)
+            else:
+                post_story(entry)
+        except Exception as e:
+            # 1アカウントの失敗で他のアカウントを巻き込まない
+            print(f"  ERROR({label}): {e}")
+            failed.append(label)
+            continue
+
+        if not DRY_RUN:
+            marker = done_marker_path(today, account)
+            marker.write_text(datetime.now(JST).isoformat(), encoding="utf-8")
+            print(f"  done marker作成: {marker.name}")
+
+    if failed:
+        raise SystemExit(f"投稿に失敗したアカウントがあります: {'、'.join(failed)}")
 
 
 if __name__ == "__main__":
