@@ -259,26 +259,39 @@ def main():
         return
 
     queue = json.loads(qfile.read_text(encoding="utf-8"))
-    entry = queue.get(SLOT)
-    if not entry:
+    slot_value = queue.get(SLOT)
+    if not slot_value:
         print(f"このslot（{SLOT}）の予定なし。終了。")
         return
 
-    # 投稿先アカウント（queueで指定。省略時は多度津のみ）
-    targets = entry.get("accounts") or DEFAULT_ACCOUNTS
-    unknown = [a for a in targets if a not in ACCOUNTS]
+    # entryは単体dict（従来）またはリスト（アカウント別に内容を変える場合。
+    # 例: 多度津用と観音寺用で別キャプション・別画像）。
+    entries = slot_value if isinstance(slot_value, list) else [slot_value]
+
+    # (entry, account) の組を作る。各entryの投稿先はentry内のaccounts（省略時は多度津）。
+    # ※ done markerはアカウント単位なので、同じアカウントを複数entryに書かないこと。
+    jobs = []
+    for e in entries:
+        for a in (e.get("accounts") or DEFAULT_ACCOUNTS):
+            jobs.append((e, a))
+
+    unknown = [a for _, a in jobs if a not in ACCOUNTS]
     if unknown:
         print(f"ERROR: 未知のアカウント指定 {unknown}")
         sys.exit(1)
+    dup = [a for _, a in jobs if [x for _, x in jobs].count(a) > 1]
+    if dup:
+        print(f"ERROR: 同じアカウントが複数エントリに指定されています {sorted(set(dup))}")
+        sys.exit(1)
 
     # まだ投稿していないアカウントだけに絞る
-    pending = [a for a in targets if not done_marker_path(today, a).exists()]
+    pending = [(e, a) for e, a in jobs if not done_marker_path(today, a).exists()]
     if not pending:
         print("対象アカウントはすべて投稿済み。終了。")
         return
-    print(f"投稿先: {'、'.join(ACCOUNTS[a]['label'] for a in pending)}")
+    print(f"投稿先: {'、'.join(ACCOUNTS[a]['label'] for _, a in pending)}")
 
-    for a in pending:
+    for _, a in pending:
         if not ACCOUNTS[a]["token"] or not ACCOUNTS[a]["user_id"]:
             print(f"ERROR: {ACCOUNTS[a]['label']}のトークン/ユーザーIDが未設定")
             sys.exit(1)
@@ -287,7 +300,7 @@ def main():
     wait_until_target()
 
     failed = []
-    for account in pending:
+    for entry, account in pending:
         use_account(account)
         label = ACCOUNTS[account]["label"]
         print(f"--- {label} ---")
