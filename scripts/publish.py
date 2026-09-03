@@ -108,8 +108,10 @@ def publish(creation_id: str) -> dict:
         try:
             return api_post(f"/{USER_ID}/media_publish", {"creation_id": creation_id})
         except RuntimeError as e:
-            # error_subcode 2207027 = メディアがまだ公開準備できていない
-            if "2207027" not in str(e) and '"code":9007' not in str(e):
+            # まだコンテナが出来上がっていないときのエラー。少し待てば通る。
+            # 2207027 = メディアが公開準備できていない
+            # 2207006 = "Media Not Found"（作った直後だと稀にこれが返る。2026-09-04に発生）
+            if not any(t in str(e) for t in ("2207027", "2207006", '"code":9007')):
                 raise
             last_err = e
             wait = 10 * (attempt + 1)
