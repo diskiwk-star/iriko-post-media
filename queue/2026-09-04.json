@@ -2,11 +2,12 @@
   "date": "2026-09-04",
   "feed": [
     {
-      "type": "image",
+      "type": "reel",
       "media": [
-        "https://raw.githubusercontent.com/diskiwk-star/iriko-post-media/main/2026-09/2026-09-04_feed_1.png"
+        "https://raw.githubusercontent.com/diskiwk-star/iriko-post-media/main/2026-09/2026-09-04_reel.mp4"
       ],
-      "caption": "9月の営業カレンダーです📅\n\n定休日は毎週水曜日と第2火曜日。朝メニューは6〜8時、通常営業は14時までとなります。\n\nお出かけの前に、ぜひチェックしてみてください。9月も多度津でお待ちしています🍜\n\n#営業日 #営業カレンダー #いりこラーメン #讃岐うどん #いりこセンター #香川グルメ #多度津"
+      "caption": "多度津の朝は、ここから始まる☀️\n\n早朝の静かな店先。入口くぐると、いりこ出汁のいい香り。\n\n朝6時からやっているラーメン屋、意外とないんです。旅の途中でも、仕事の前でも、ふらっと寄れる一杯を。\n\n週末の朝、多度津で待ってます🍜\n\n#朝ラー #朝ごはん #いりこラーメン #讃岐うどん #いりこセンター #香川グルメ #多度津",
+      "cover": "https://raw.githubusercontent.com/diskiwk-star/iriko-post-media/main/2026-09/2026-09-04_reel_cover.png"
     },
     {
       "type": "image",
@@ -21,9 +22,9 @@
   ],
   "story": [
     {
-      "type": "image",
+      "type": "video",
       "media": [
-        "https://raw.githubusercontent.com/diskiwk-star/iriko-post-media/main/2026-09/2026-09-04_story_9x16.png"
+        "https://raw.githubusercontent.com/diskiwk-star/iriko-post-media/main/2026-09/2026-09-04_reel.mp4"
       ]
     },
     {
