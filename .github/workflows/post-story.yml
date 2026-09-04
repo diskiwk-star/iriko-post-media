@@ -12,6 +12,10 @@ on:
         description: 'ドライラン（投稿せず内容表示のみ）'
         type: boolean
         default: false
+      target_time:
+        description: '投稿時刻（JST・HH:MM）。臨時投稿で時間を指定したいとき。空なら既定時刻'
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -34,6 +38,7 @@ jobs:
           IG_ACCESS_TOKEN_KANONJI: ${{ secrets.IG_ACCESS_TOKEN_KANONJI }}
           IG_USER_ID_KANONJI: ${{ vars.IG_USER_ID_KANONJI }}
           SLOT: story
+          TARGET_TIME: ${{ inputs.target_time }}
           DRY_RUN: ${{ inputs.dry_run == true && '1' || '' }}
         run: python3 scripts/publish.py
 
