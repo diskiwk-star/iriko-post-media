@@ -1,0 +1,47 @@
+name: post-evening-feed (21:00 JST)
+
+on:
+  schedule:
+    # 21:00枠（queue/YYYY-MM-DD_2100.json がある日だけ投稿。無い日はすぐ終わる）。
+    # 考え方は post-feed.yml と同じ。早めに起動して 21:00 まで待ち、予備を2本置く。
+    - cron: '43 10 * * *'   # 本命（21:00 まで待機）
+    - cron: '43 11 * * *'   # 予備1
+    - cron: '13 12 * * *'   # 予備2（遅延時は即投稿）
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'ドライラン（投稿せず内容表示のみ）'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ig-post-evening-feed
+  cancel-in-progress: true
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Publish to Instagram (feed, 21:00 slot)
+        env:
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ vars.IG_USER_ID }}
+          IG_ACCESS_TOKEN_KANONJI: ${{ secrets.IG_ACCESS_TOKEN_KANONJI }}
+          IG_USER_ID_KANONJI: ${{ vars.IG_USER_ID_KANONJI }}
+          SLOT: feed
+          TARGET_TIME: '21:00'
+          QUEUE_TAG: _2100
+          DRY_RUN: ${{ inputs.dry_run == true && '1' || '' }}
+        run: python3 scripts/publish.py
+
+      - name: Commit done marker
+        run: |
+          git config user.name "iriko-autopost-bot"
+          git config user.email "actions@github.com"
+          git add queue/*.done 2>/dev/null || true
+          git diff --cached --quiet || (git commit -m "evening feed posted $(date -u +%F)" && git push)

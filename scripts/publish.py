@@ -54,6 +54,9 @@ USER_ID = ACCOUNTS["tadotsu"]["user_id"]
 SLOT = os.environ.get("SLOT", "feed")
 DRY_RUN = os.environ.get("DRY_RUN", "") == "1"
 TARGET_TIME = os.environ.get("TARGET_TIME") or ("05:00" if SLOT == "feed" else "05:30")
+# 朝以外の投稿枠（例: "_2100" = 21:00枠）。queue/YYYY-MM-DD{QUEUE_TAG}.json を読み、
+# done markerも同じタグ付きの名前にして朝の枠と混ざらないようにする。
+QUEUE_TAG = os.environ.get("QUEUE_TAG", "")
 MAX_WAIT_SEC = 90 * 60  # 早く起動しすぎた場合の待機上限（保険）
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -246,15 +249,15 @@ def use_account(key: str):
 def done_marker_path(today: str, account: str) -> Path:
     # 多度津は従来のファイル名を維持する（過去分のマーカーと互換を保つため）
     if account == "tadotsu":
-        return QUEUE_DIR / f"{today}.{SLOT}.done"
-    return QUEUE_DIR / f"{today}.{SLOT}.{account}.done"
+        return QUEUE_DIR / f"{today}{QUEUE_TAG}.{SLOT}.done"
+    return QUEUE_DIR / f"{today}{QUEUE_TAG}.{SLOT}.{account}.done"
 
 
 def main():
     today = os.environ.get("QUEUE_DATE") or datetime.now(JST).strftime("%Y-%m-%d")
-    qfile = QUEUE_DIR / f"{today}.json"
+    qfile = QUEUE_DIR / f"{today}{QUEUE_TAG}.json"
 
-    print(f"date(JST)={today} slot={SLOT} dry_run={DRY_RUN}")
+    print(f"date(JST)={today} slot={SLOT}{QUEUE_TAG} dry_run={DRY_RUN}")
 
     if not qfile.exists():
         print(f"queue無し（{qfile.name}）。今日は投稿予定なし。終了。")
