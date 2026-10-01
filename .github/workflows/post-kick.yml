@@ -1,0 +1,65 @@
+name: post-kick (見張り役からの起動)
+
+# 定時実行（schedule）が混雑で起動しなかったとき用の起動口。
+# クラウドの見張り役は GitHub の起動ボタン（workflow_dispatch）を押せないので、
+# 代わりに kick/request.txt を書いたブランチを push する。push での起動は遅れにくい。
+# request.txt には投稿する枠を1行ずつ書く: feed / story / evening-feed / evening-story
+# 投稿そのものと done マーカーは main に対して行う（push されたブランチは合図だけ）。
+on:
+  push:
+    branches-ignore: [main]
+    paths: ['kick/request.txt']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ig-post-kick
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main（投稿対象のキュー）
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Read request
+        id: req
+        run: |
+          git fetch -q origin "${GITHUB_SHA}"
+          REQ=$(git show "${GITHUB_SHA}:kick/request.txt" | tr -d '\r' | grep -E '^(feed|story|evening-feed|evening-story)$' | sort -u | tr '\n' ' ')
+          echo "要求された枠: ${REQ:-（なし）}"
+          echo "slots=${REQ}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish requested slots
+        env:
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_USER_ID: ${{ vars.IG_USER_ID }}
+          IG_ACCESS_TOKEN_KANONJI: ${{ secrets.IG_ACCESS_TOKEN_KANONJI }}
+          IG_USER_ID_KANONJI: ${{ vars.IG_USER_ID_KANONJI }}
+          SLOTS: ${{ steps.req.outputs.slots }}
+        run: |
+          # feed → story の順に流す（story は目標時刻まで publish.py 側で待つ）
+          for s in feed evening-feed story evening-story; do
+            case " $SLOTS " in *" $s "*) ;; *) continue ;; esac
+            case $s in
+              feed)          SLOT=feed  TARGET_TIME=05:00 QUEUE_TAG= ;;
+              story)         SLOT=story TARGET_TIME=05:30 QUEUE_TAG= ;;
+              evening-feed)  SLOT=feed  TARGET_TIME=21:00 QUEUE_TAG=_2100 ;;
+              evening-story) SLOT=story TARGET_TIME=21:30 QUEUE_TAG=_2100 ;;
+            esac
+            echo "=== $s ==="
+            SLOT=$SLOT TARGET_TIME=$TARGET_TIME QUEUE_TAG=$QUEUE_TAG python3 scripts/publish.py || echo "::warning::$s で失敗"
+          done
+
+      - name: Commit done marker & 合図ブランチを削除
+        if: always()
+        run: |
+          git config user.name "iriko-autopost-bot"
+          git config user.email "actions@github.com"
+          git add queue/*.done 2>/dev/null || true
+          git diff --cached --quiet || (git commit -m "kick posted $(date -u +%F)" && git pull -q --rebase && git push)
+          git push origin --delete "${GITHUB_REF_NAME}" || true
