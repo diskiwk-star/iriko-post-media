@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-11",
+  "feed": [
+    {
+      "type": "carousel",
+      "media": [
+        "https://raw.githubusercontent.com/diskiwk-star/iriko-post-media/main/2026-10/2026-10-11_feed_1.png",
+        "https://raw.githubusercontent.com/diskiwk-star/iriko-post-media/main/2026-10/2026-10-11_feed_2.png"
+      ],
+      "caption": "日曜の朝は、いりこの湯気から☀️\n\n涼しくなってきた朝は、あったかい一杯がうれしい季節。\n伊吹島産いりこの澄んだだしが、体にやさしく染みわたります。\n\n朝6〜8時は、朝限定メニューもご用意しています。\n営業は6:00〜14:00。お待ちしています🍜\n\n#朝ラー #日曜の朝 #伊吹いりこ #いりこラーメン #いりこセンター #香川ラーメン #香川グルメ #讃岐うどん"
+    },
+    {
+      "type": "carousel",
+      "media": [
+        "https://raw.githubusercontent.com/diskiwk-star/iriko-post-media/main/2026-10/2026-10-11_kanonji_feed_1.png",
+        "https://raw.githubusercontent.com/diskiwk-star/iriko-post-media/main/2026-10/2026-10-11_kanonji_feed_2.png"
+      ],
+      "caption": "日曜の朝は、いりこの湯気から☀️\n\n涼しくなってきた朝は、あったかい一杯がうれしい季節。\n伊吹島産いりこの澄んだだしが、体にやさしく染みわたります。\n\n朝6〜8時は、朝限定メニューもご用意しています。\n営業は6:00〜14:00。お待ちしています🍜\n\n#朝ラー #日曜の朝 #伊吹いりこ #いりこラーメン #いりこセンター #香川ラーメン #香川グルメ #讃岐うどん",
+      "accounts": [
+        "kanonji"
+      ]
+    }
+  ],
+  "story": [
+    {
+      "type": "image",
+      "media": [
+        "https://raw.githubusercontent.com/diskiwk-star/iriko-post-media/main/2026-10/2026-10-11_story_9x16.png"
+      ]
+    },
+    {
+      "type": "image",
+      "media": [
+        "https://raw.githubusercontent.com/diskiwk-star/iriko-post-media/main/2026-10/2026-10-11_kanonji_story_9x16.png"
+      ],
+      "accounts": [
+        "kanonji"
+      ]
+    }
+  ]
+}
