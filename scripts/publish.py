@@ -151,9 +151,18 @@ def post_feed(entry: dict):
         result = publish(c["id"])
     elif typ == "carousel":
         children = []
+        has_video = False
         for url in media:
-            c = api_post(f"/{USER_ID}/media",
-                         {"image_url": url, "is_carousel_item": "true"})
+            if url.lower().endswith((".mp4", ".mov")):
+                # 動画と画像が混在するカルーセル（2026-10-18追加）。動画は処理完了を待つ。
+                has_video = True
+                c = api_post(f"/{USER_ID}/media",
+                             {"media_type": "VIDEO", "video_url": url,
+                              "is_carousel_item": "true"})
+                wait_until_ready(c["id"])
+            else:
+                c = api_post(f"/{USER_ID}/media",
+                             {"image_url": url, "is_carousel_item": "true"})
             children.append(c["id"])
             time.sleep(2)
         parent = create_container({
@@ -161,6 +170,8 @@ def post_feed(entry: dict):
             "children": ",".join(children),
             "caption": caption,
         })
+        if has_video:
+            wait_until_ready(parent["id"])
         result = publish(parent["id"])
     elif typ == "reel":
         params = {
