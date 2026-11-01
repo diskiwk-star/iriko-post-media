@@ -19,6 +19,10 @@ on:
         description: '投稿時刻（JST・HH:MM）。臨時投稿で時間を指定したいとき。空なら既定時刻'
         type: string
         default: ''
+      queue_tag:
+        description: '臨時の追加投稿用。queue/YYYY-MM-DD{queue_tag}.json を読む（例: _menu）。空なら通常のキュー'
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -43,6 +47,7 @@ jobs:
           IG_USER_ID_KANONJI: ${{ vars.IG_USER_ID_KANONJI }}
           SLOT: feed
           TARGET_TIME: ${{ inputs.target_time }}
+          QUEUE_TAG: ${{ inputs.queue_tag }}
           DRY_RUN: ${{ inputs.dry_run == true && '1' || '' }}
         run: python3 scripts/publish.py
 
